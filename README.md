@@ -1,151 +1,89 @@
-# Integração com API do Mercado Bitcoin (C# .NET)
+# MercadoBitcoinApi
 
-Este projeto implementa uma integração completa com a API v4 do Mercado Bitcoin, permitindo consultar informações sobre contas e posições de ativos com suporte a filtros por data.
+API wrapper para integração com a API pública do Mercado Bitcoin. Fornece endpoints para autorização e consulta de contas/posições, além de serviços internos para autenticação e chamadas HTTP.
 
-## 📋 Funcionalidades
+## Visão geral
+- Projetado em .NET 10 (C# 14).
+- Serviços principais:
+  - `AuthenticationService` — realiza `POST /api/v4/authorize` e retorna `AuthResponse` (bearer token).
+  - `MercadoBitcoinService` — consome endpoints com `Authorization: Bearer {token}` (`/accounts`, `/accounts/{id}/positions`).
+- API expõe controladores em `api/mercadobitcoin`.
 
-- ✅ Conexão autenticada com a API do Mercado Bitcoin
-- ✅ Autenticação HMAC-SHA512 (TAPI) com formato hexadecimal
-- ✅ Consulta de contas do usuário
-- ✅ Consulta de posições de ativos por conta
-- ✅ Filtros de consulta por data (início e fim) com validação
-- ✅ Código estruturado e bem organizado
-- ✅ Tratamento de erros robusto com mensagens detalhadas
-- ✅ Thread-safe para uso em ambientes concorrentes
-- ✅ Validação de parâmetros de entrada
+## Requisitos
+- .NET 10 SDK
+- Variáveis de ambiente ou segredos de usuário com credenciais do Mercado Bitcoin:
+  - `TAPI_ID`
+  - `TAPI_SECRET`
 
-## 🏗️ Estrutura do Projeto
+## Configuração
+1. Configure variáveis de ambiente:
+   - Windows PowerShell:
+     - $env:TAPI_ID = "seu_tapi_id"
+     - $env:TAPI_SECRET = "seu_tapi_secret"
+   - Linux/macOS:
+     - export TAPI_ID="seu_tapi_id"
+     - export TAPI_SECRET="seu_tapi_secret"
 
-```
-MercadoBitcoinApi/
-├── Models/
-│   ├── Account.cs          # Modelo de conta
-│   ├── Position.cs         # Modelo de posição de ativo
-│   └── ApiResponse.cs      # Resposta genérica da API
-├── Services/
-│   ├── IAuthenticationService.cs    # Interface de autenticação
-│   ├── AuthenticationService.cs     # Implementação HMAC-SHA512
-│   ├── IMercadoBitcoinService.cs    # Interface do serviço principal
-│   └── MercadoBitcoinService.cs     # Implementação do cliente HTTP
-└── Program.cs              # Exemplo de uso
-```
+2. Ou use segredos de usuário para desenvolvimento:
+   - No Visual Studio: abra __Manage User Secrets__ do projeto e adicione:
+     ```json
+     {
+       "MercadoBitcoin": {
+         "TapiId": "<seu_tapi_id>",
+         "TapiSecret": "<seu_tapi_secret>"
+       }
+     }
+     ```
+   - Ou via CLI:
+     ```
+     dotnet user-secrets init
+     dotnet user-secrets set "MercadoBitcoin:TapiId" "<seu_tapi_id>"
+     dotnet user-secrets set "MercadoBitcoin:TapiSecret" "<seu_tapi_secret>"
+     ```
 
-## 🔑 Configuração
+3. Certifique-se de registrar `HttpClient` no DI conforme `Program.cs`. Por padrão o projeto já registra `AddHttpClient` e os serviços.
 
-### Pré-requisitos
+## Executar localmente
+- Build + run:
 
-- .NET 10.0 SDK ou superior (compatível com .NET 8.0+)
-- Credenciais da API do Mercado Bitcoin (TAPI-ID e TAPI-SECRET)
+- Swagger UI:
+  - Em desenvolvimento: disponível na raiz (`/`)
+  - Em produção: `/swagger`
 
-### Como obter as credenciais
+## Endpoints principais
+- `POST /api/mercadobitcoin/authorize`
+  - Body JSON: `{ "login": "...", "password": "..." }`
+  - Retorna `AuthResponse` com `access_token` e `expiration`.
 
-1. Acesse sua conta no Mercado Bitcoin
-2. No menu superior, clique no seu nome e selecione "Configurações"
-3. No menu lateral, em "Integrações", selecione "Chave de API"
-4. Clique em "Nova Chave", preencha os campos e confirme com o código 2FA
-5. Guarde o **TAPI-ID** e o **TAPI-SECRET** gerados
+- `GET /api/mercadobitcoin/accounts`
+  - Retorna lista de contas.
+  - O controller obtém token internamente via `AuthenticationService` (não é necessário enviar token no request ao seu serviço).
 
-## 🚀 Como Usar
+- `GET /api/mercadobitcoin/accounts/{accountId}/positions?startDate=yyyy-MM-dd&endDate=yyyy-MM-dd`
+  - Retorna posições da conta (com filtros opcionais).
 
-### 1. Compilar o projeto
+Exemplo curl (autentica diretamente contra a API pública — apenas para referência):
+curl -X POST "https://localhost:5001/api/mercadobitcoin/authorize" 
+-H "Content-Type: application/json" 
+-d '{"login":"<login>","password":"<password>"}'
 
-```bash
-dotnet build
-```
 
-### 2. Executar o exemplo
+## Testes
+- Projeto de testes usa xUnit + Moq.
+- Executar testes:
 
-```bash
-dotnet run --project MercadoBitcoinApi
-```
 
-O programa solicitará as credenciais (TAPI-ID e TAPI-SECRET) e então:
-- Listará todas as contas disponíveis
-- Consultará as posições da primeira conta
-- Demonstrará o uso de filtros por data
+## Observações de segurança e produção
+- Nunca comite `TAPI_SECRET` em repositórios.
+- Tokens e credenciais devem ser armazenados em cofre/secret manager em produção (ex.: Azure Key Vault, AWS Secrets Manager).
+- `HttpClient` é registrado via DI — evite alterar `DefaultRequestHeaders` ou `BaseAddress` por chamada para prevenir vazamento de cabeçalhos entre requisições concorrentes. O código já utiliza `HttpRequestMessage` para definir `Authorization` por requisição.
+- Proteja endpoints que expõem tokens ou informações sensíveis. Remova endpoints de debug antes de publicar.
 
-### 3. Usar em seu próprio código
+## Boas práticas e próximas melhorias
+- Cache do `AuthResponse` até `expiration` para reduzir chamadas a `/authorize`.
+- Tratamento de retries expondo política (Polly) para chamadas externas.
+- Logs estruturados sem expor secrets.
 
-```csharp
-using MercadoBitcoinApi.Services;
-
-// Configurar serviços
-var httpClient = new HttpClient();
-var authService = new AuthenticationService("seu-tapi-id", "seu-tapi-secret");
-var mercadoBitcoinService = new MercadoBitcoinService(httpClient, authService);
-
-// Obter contas
-var accounts = await mercadoBitcoinService.GetAccountsAsync();
-
-// Obter posições sem filtro
-var positions = await mercadoBitcoinService.GetPositionsAsync("account-id");
-
-// Obter posições com filtro de data
-var startDate = DateTime.Now.AddDays(-30);
-var endDate = DateTime.Now;
-var filteredPositions = await mercadoBitcoinService.GetPositionsAsync(
-    "account-id",
-    startDate: startDate,
-    endDate: endDate
-);
-```
-
-## 🔒 Segurança
-
-⚠️ **IMPORTANTE**: Nunca compartilhe ou commite suas credenciais (TAPI-SECRET) no código. Em produção, utilize:
-
-- Variáveis de ambiente
-- Azure Key Vault
-- AWS Secrets Manager
-- Outros gerenciadores de segredos
-
-## 📚 Documentação da API
-
-A documentação oficial da API do Mercado Bitcoin está disponível em:
-https://api.mercadobitcoin.net/api/v4/docs
-
-## 🛠️ Tecnologias Utilizadas
-
-- .NET 10.0
-- HttpClient (para requisições HTTP)
-- Newtonsoft.Json (para serialização/deserialização JSON)
-- HMAC-SHA512 (para autenticação)
-
-## 📝 Notas de Implementação
-
-### Autenticação HMAC-SHA512
-
-A autenticação é realizada através de:
-- **TAPI-ID**: Identificador da chave de API
-- **TAPI-NONCE**: Número único incremental para cada requisição (thread-safe)
-- **TAPI-MAC**: Assinatura HMAC-SHA512 calculada sobre a mensagem da requisição
-
-A mensagem assinada segue o formato: `{method}{path}{queryString}{body}{nonce}`
-
-O MAC é gerado em hexadecimal (lowercase), conforme especificação da API v4 do Mercado Bitcoin.
-
-### Filtros de Data
-
-Os filtros de data são opcionais e podem ser usados para:
-- Consultar posições em um período específico
-- Reduzir a quantidade de dados retornados
-- Melhorar a performance das consultas
-
-**Validação**: O sistema valida automaticamente que a data inicial não seja posterior à data final, lançando uma exceção `ArgumentException` caso contrário.
-
-### Tratamento de Erros
-
-O serviço implementa tratamento robusto de erros:
-- Captura e relança exceções HTTP com detalhes da resposta da API
-- Trata erros de deserialização JSON separadamente
-- Fornece mensagens de erro claras e informativas
-- Valida parâmetros de entrada antes de fazer requisições
-
-## 🤝 Contribuindo
-
-Este é um projeto de exemplo/teste. Sinta-se à vontade para sugerir melhorias ou correções.
-
-## 📄 Licença
-
-Este projeto é fornecido como exemplo educacional.
-
+Se quiser, eu:
+- adiciono exemplos de `launchSettings.json` para desenvolvimento no Visual Studio, ou
+- gero um arquivo de configuração `appsettings.Development.json` com placeholders.
