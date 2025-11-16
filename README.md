@@ -70,11 +70,3 @@ curl -X POST "https://localhost:5001/api/mercadobitcoin/authorize"
 
 ## Testes
 - Projeto de testes usa xUnit + Moq.
-- Executar testes:
-
-
-## Observações de segurança e produção
-- Nunca comite `TAPI_SECRET` em repositórios.
-- Tokens e credenciais devem ser armazenados em cofre/secret manager em produção (ex.: Azure Key Vault, AWS Secrets Manager).
-- `HttpClient` é registrado via DI — evite alterar `DefaultRequestHeaders` ou `BaseAddress` por chamada para prevenir vazamento de cabeçalhos entre requisições concorrentes. O código já utiliza `HttpRequestMessage` para definir `Authorization` por requisição.
-- Proteja endpoints que expõem tokens ou informações sensíveis. Remova endpoints de debug antes de publicar.
