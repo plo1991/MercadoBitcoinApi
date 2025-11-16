@@ -99,7 +99,7 @@ public class MercadoBitcoinController : ControllerBase
 
     /// <summary>
     /// Encaminha uma requisição de autorização para a API do Mercado Bitcoin (POST /authorize).
-    /// Retorna o JSON bruto recebido da API (ex.: token, expires_in, etc).
+    /// Retorna o JSON bruto recebido da API (ex.: access_token, expiration, etc).
     /// </summary>
     [HttpPost("authorize")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
